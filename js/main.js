@@ -2,36 +2,45 @@ $(function() {
   
     // Declare variables to be used
 
-    var questions = [];
+    var questions = []; //Holds quiz questions
+    var results = []; //Holds results.json
+    var total_available_points = 0; //The total number of points available to win
     var current_question;
     var current_question_index = -1;
     var score = 0;
 
-    $('.modal').leanModal({
-      opacity: .1, // Opacity of modal background
-      in_duration: 300, // Transition in duration
-      out_duration: 200 // Transition out duration
-    });
-
 
     function setupQuiz()
     {
+        $('#replay_btn').hide();
+        $('#final_score').hide();
         getJsonData();
     }
 
+    //Get all the data needed
+    //Populate questions and results arrays
+    //Call to display first question
     function getJsonData()
     {
         // Get Quiz questions
         $.getJSON( "http://proto.io/en/jobs/candidate-questions/quiz.json", function( data ) {
 
+            $('#quiz_head').text(data.title);
             for(var i=0; i<data.questions.length; i++)
             {
-                questions.push(data.questions[i]);
+                total_available_points += data.questions[i].points; //Calculate the total available points to be won
+                questions.push(data.questions[i]); //Create object which contains the questions
+                shuffle(questions);
             }
 
             // Get Quiz results once questions are loaded
-            $.getJSON( "http://proto.io/en/jobs/candidate-questions/result.json", function( data ) {
-                console.log(data);
+            $.getJSON( "http://proto.io/en/jobs/candidate-questions/result.json", function( data_res ) {
+                
+                for(var i=0; i<data_res.results.length; i++)
+                {
+                    results.push(data_res.results[i]);
+                }
+
                 displayQuestion();
             });
         });
@@ -41,11 +50,21 @@ $(function() {
     {
         var content = ""; //Variable used to store answers HTML to be appended to #answers div
 
+        //reset fields
         $('#answers').empty();
+        $('#q_image').empty();
+        $('#message').hide();
+        $('#num_answers_info').addClass('hidden');
 
+        //Remove last question form list of available questions
         if(current_question_index >= 0)
         {
             questions.splice(current_question_index, 1);
+            if(questions.length == 0)
+            {
+                showResult();
+                return;
+            }
         }
         console.log(questions);
 
@@ -53,8 +72,9 @@ $(function() {
         current_question_index = Math.floor(Math.random()*questions.length);
         current_question = questions[current_question_index];
 
-        //Display title attribute
+        //Display title attribute and image
         $('#q_title').text(current_question.title);
+        $('#q_image').append('<img src='+ current_question.img +'>');
         
         //Check question Type and display relevant view
         if(current_question.question_type === "mutiplechoice-single")
@@ -81,14 +101,10 @@ $(function() {
                 content += '<div class="col s6 answer_box" id="'+ current_question.possible_answers[i].a_id +'">'+ current_question.possible_answers[i].caption +'</div>';
             }
 
-            //get sum of correct answers based on id
-            var answers_sum = 0;
-            for(var i=0; i<current_question.correct_answer.length; i++)
-            {
-                answers_sum += parseInt(current_question.correct_answer[i] ,10);
-            }
-
             $('#answers').append(content);
+
+            //Tell the user how many answers to choose
+            $('#num_answers_info').text('You need to select '+ current_question.correct_answer.length + ' answers').removeClass('hidden');
         }
         else //true or false type
         {
@@ -97,6 +113,7 @@ $(function() {
         }
     }
 
+    //Shuffles the array passed
     function shuffle(a) {
         var j, x, i;
         for (i = a.length; i; i--) {
@@ -112,24 +129,48 @@ $(function() {
     {
         score += current_question.points;
 
-        $('#modal1').openModal();
+        $('#submit_btn').hide();
+        $('#message').text('CORRECT!!!').css('color', 'green').show();
 
-        //Close modal and display new question after 3 seconds
+        //Show correct and display new question after 3 seconds
         setTimeout(function(){
-            $('#modal1').closeModal();
+            $('#message').hide();
+            $('#submit_btn').show();
             displayQuestion();
         }, 3000);
     }
 
     function wrong_answer()
     {
-        $('#modal2').openModal(); //Open modal
+        //Hide submit button and show message
+        $('#submit_btn').hide();
+        $('#message').text('AWW, WRONG ANSWER :(').css('color', 'red').show();
 
-        //Close modal and display new question after 3 seconds
+        //Hide wrong and display new question after 3 seconds
         setTimeout(function(){
-            $('#modal2').closeModal();
+            $('#message').hide();
+            $('#submit_btn').show();
             displayQuestion();
         }, 3000);
+    }
+
+    function showResult()
+    {
+        $('#submit_btn').hide();
+        $('#quiz_head').hide();
+        var score_percent = score/total_available_points*100;
+
+        for(var i=0; i<results.length; i++)
+        {
+            if(score_percent >= results[i].minpoints && score_percent <= results[i].maxpoints)
+            {
+                $('#q_title').text(results[i].title);
+                $('#final_score').text('Score: '+ score_percent.toFixed(2) +'%').show();
+                $('#message').addClass('blue-text').text(results[i].message).show();
+                $('#q_image').empty().append('<img src='+ results[i].img +'>');
+                $('#replay_btn').show();
+            }
+        }
     }
 
     setupQuiz();
@@ -139,68 +180,145 @@ $(function() {
 
     // Trigger when user clicks on an answer
     $('body').on('click', '.answer_box', function(){
-        
-        if(current_question.question_type === "mutiplechoice-single")
+
+        //For single answer questions, check if an answer was already selected and unselect it
+        //Then add new selection
+        if(current_question.question_type == "mutiplechoice-single" || current_question.question_type == "truefalse")
         {
-            //Compare the id of the selected item with the id of the correct answer
-            if(parseInt($(this).attr('id'), 10) == current_question.correct_answer)
+            var silver = $(this).parent().find('.silver').removeClass('silver');
+            $(this).addClass('silver');
+        }
+
+        //Check for multi-answer
+        if(current_question.question_type == "mutiplechoice-multiple")
+        {
+            var silver = [];
+            silver = $(this).parent().find('.silver');
+
+            //Check if user is selecting or unselecting an answer
+            //and also warn the user if he tries to select more than the allowed number of answers
+            if($(this).hasClass('silver'))
             {
-                correct_answer();
+                // $(this).css("background-color", "white");
+                $(this).removeClass('silver');
             }
             else
             {
-                wrong_answer();
-            }
-        }
-        else if(current_question.question_type === "mutiplechoice-multiple")
-        {
-            $(this).addClass('selected'); // Mark answer as selected
-
-            //Check if the user selected man number of possible answers -- It must equal the number of correct answers otherwise let the player continue answering
-            if($(this).parent().find('.selected').length == current_question.correct_answer.length)
-            {
-                var selected = $(this).parent().find('.selected');
-                var counter = 0; //Keep track of answers checked
-
-                for(var i=0; i<selected.length; i++)
+                if(silver.length >= current_question.correct_answer.length)
                 {
-                    //If the selected answer is included in the array of correct answers, the comparison will return the index
-                    // We increment the counter of correct answers found
-                    if($.inArray( parseInt(selected[i].id ,10), current_question.correct_answer ) >= 0)
+                    alert('You are only allowed to select ' + current_question.correct_answer.length + ' answers.')
+                }
+                else
+                {
+                    $(this).addClass('silver');
+                }
+            }
+
+        }
+    });
+
+
+    //Handler for clicking on submit button
+    $('#submit_btn').click(function(ev){
+        
+        //Check that there is at least one selected answer
+        if($('#answers').find('.silver').length <= 0)
+        {
+            $('#message').text('Please select an answer').css('color', 'red').show();
+        }
+        //Check for multi answers that the correct number of answers has been selected
+        else if(current_question.question_type == "mutiplechoice-multiple" && $('#answers').find('.silver').length != current_question.correct_answer.length)
+        {
+            $('#message').text('You need to select a total of '+ current_question.correct_answer.length + ' answers').css('color', 'orange').show();
+        }
+        //If no errors proceed
+        else
+        {
+            //For single answer questions check if the answer is correct by reading the ID
+            if(current_question.question_type == "mutiplechoice-single")
+            {
+                var id = parseInt($('.silver')[0].id, 10); // Get the id of selected element
+
+                //Compare the id of the selected item with the id of the correct answer
+                if(id == current_question.correct_answer)
+                {
+                    $('#'+ id +'').css("background-color", "green"); //Mark answer as correct with green bg
+                    correct_answer();
+                }
+                else //answer is wrong
+                {
+                    $('#'+ id +'').css("background-color", "red"); // Mark the answer as wrong with red bg
+                    $('#'+current_question.correct_answer+'').css("background-color", "green"); //Indicate correct answer in green
+                    wrong_answer();
+                }
+            }
+            else if(current_question.question_type == "mutiplechoice-multiple")
+            {
+
+                //Check if the user selected man number of possible answers -- It must equal the number of correct answers otherwise let the player continue answering
+                if($('.silver').length == current_question.correct_answer.length)
+                {
+                    //Get user answers
+                    var selected = $('#answers').find('.silver');
+                    var counter = 0; //Keep track of answers checked
+
+                    for(var i=0; i<selected.length; i++)
                     {
-                        counter++;
+                        //If the selected answer is included in the array of correct answers, the comparison will return the index
+                        // We increment the counter of correct answers found
+                        if($.inArray( parseInt(selected[i].id ,10), current_question.correct_answer ) >= 0)
+                        {
+                            counter++;
+                        }
+                    }
+
+                    // Check if the number of correct answers found is equal to the number of correct answers which indicates that the user answered correctly
+                    if(counter == current_question.correct_answer.length)
+                    {
+                        for(var i=0; i<current_question.correct_answer.length; i++)
+                        {
+                            $('#'+ current_question.correct_answer[i] +'').css("background-color", "green");
+                        }
+                        correct_answer();
+                    }
+                    else
+                    {
+                        for(var i=0; i<current_question.correct_answer.length; i++)
+                        {
+                            $('#'+ current_question.correct_answer[i] +'').css("background-color", "green");
+                        }
+                        wrong_answer();
                     }
                 }
-
-                // Check if the number of correct answers found is equal to the number of correct answers which indicates that the user answered correctly
-                if(counter == current_question.correct_answer.length)
+            }
+            else //True or false question
+            {
+                var bool_answer = false;
+                var id = $('.silver')[0].id; // Get the id of selected element
+                
+                if(id == 'true')
                 {
+                    bool_answer = true;
+                }
+
+                if(bool_answer == current_question.correct_answer)
+                {
+                    $('#'+ id +'').css("background-color", "green");
                     correct_answer();
                 }
                 else
                 {
+                    $('#'+ id +'').css("background-color", "red"); // Mark the answer as wrong with red bg
+                    $('#'+current_question.correct_answer+'').css("background-color", "green"); //Indicate correct answer in green
                     wrong_answer();
                 }
             }
         }
-        else
-        {
-            var bool_answer = false;
-            
-            if($(this).attr('id') == 'true')
-            {
-                bool_answer = true;
-            }
+    });
 
-            if(bool_answer == current_question.correct_answer)
-            {
-                correct_answer();
-            }
-            else
-            {
-                wrong_answer();
-            }
-        }
+    //Handler to replay the game
+    $('#replay_btn').click(function(){
+        location.reload();
     });
 
 });
