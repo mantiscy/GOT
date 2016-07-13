@@ -5,3 +5,12 @@
 .hidden {
     visibility: hidden;
 }
+
+.selected {
+    background-color: silver;
+}
+
+.modal {
+    width: 30vw;
+    height: 30vh;
+}
