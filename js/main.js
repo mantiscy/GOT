@@ -66,7 +66,6 @@ $(function() {
                 return;
             }
         }
-        console.log(questions);
 
         //get a random question and remove it from list a available questions
         current_question_index = Math.floor(Math.random()*questions.length);
@@ -267,7 +266,6 @@ $(function() {
                     {
                         //If the selected answer is included in the array of correct answers, the comparison will return the index
                         // We increment the counter of correct answers found
-                        console.log(selected[i].id);
                         if($.inArray( parseInt(selected[i].id ,10), current_question.correct_answer ) >= 0)
                         {
                             counter++;
