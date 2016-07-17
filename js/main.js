@@ -85,7 +85,7 @@ $(function() {
             //Loop through answer set and create HTML which displays the answers
             for(var i=0; i<current_question.possible_answers.length; i++)
             {
-                content += '<div class="col s6 answer_box" id="'+ current_question.possible_answers[i].a_id +'">'+ current_question.possible_answers[i].caption +'</div>';
+                content += '<div class="col s6 answer_box"><span class="answer_text" id="'+ current_question.possible_answers[i].a_id +'">'+ current_question.possible_answers[i].caption +'</span></div>';
             }
             
             $('#answers').append(content);
@@ -98,7 +98,7 @@ $(function() {
             //Loop through answer set and create HTML which displays the answers
             for(var i=0; i<current_question.possible_answers.length; i++)
             {
-                content += '<div class="col s6 answer_box" id="'+ current_question.possible_answers[i].a_id +'">'+ current_question.possible_answers[i].caption +'</div>';
+                content += '<div class="col s6 answer_box"><span class="answer_text" id="'+ current_question.possible_answers[i].a_id +'"">'+ current_question.possible_answers[i].caption +'</span></div>';
             }
 
             $('#answers').append(content);
@@ -108,7 +108,7 @@ $(function() {
         }
         else //true or false type
         {
-            content += '<div class="col s6 answer_box" id="true">TRUE</div><div class="col s6 answer_box" id="false">FALSE</div>';
+            content += '<div class="col s6 answer_box"><span class="answer_text" id="true">TRUE</span></div><div class="col s6 answer_box"><span class="answer_text" id="false">FALSE</span></div>';
             $('#answers').append(content);
         }
     }
@@ -186,7 +186,7 @@ $(function() {
         if(current_question.question_type == "mutiplechoice-single" || current_question.question_type == "truefalse")
         {
             var silver = $(this).parent().find('.silver').removeClass('silver');
-            $(this).addClass('silver');
+            $(this).find('.answer_text').addClass('silver');
         }
 
         //Check for multi-answer
@@ -197,20 +197,21 @@ $(function() {
 
             //Check if user is selecting or unselecting an answer
             //and also warn the user if he tries to select more than the allowed number of answers
-            if($(this).hasClass('silver'))
+            if($(this).find('.answer_text').hasClass('silver'))
             {
                 // $(this).css("background-color", "white");
-                $(this).removeClass('silver');
+                $(this).find('.answer_text').removeClass('silver');
             }
             else
             {
                 if(silver.length >= current_question.correct_answer.length)
                 {
-                    alert('You are only allowed to select ' + current_question.correct_answer.length + ' answers.')
+                    // alert('You are only allowed to select ' + current_question.correct_answer.length + ' answers.');
+                    $('#message').text('You can only select a total of '+ current_question.correct_answer.length + ' answers').css('color', 'orange').show();
                 }
                 else
                 {
-                    $(this).addClass('silver');
+                    $(this).find('.answer_text').addClass('silver');
                 }
             }
 
@@ -266,6 +267,7 @@ $(function() {
                     {
                         //If the selected answer is included in the array of correct answers, the comparison will return the index
                         // We increment the counter of correct answers found
+                        console.log(selected[i].id);
                         if($.inArray( parseInt(selected[i].id ,10), current_question.correct_answer ) >= 0)
                         {
                             counter++;
